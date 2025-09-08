@@ -4,7 +4,7 @@ Terramino is a Tetris-like game application with comprehensive monitoring and ob
 
 ## 🎮 Application Overview
 
-![Terramino Game Interface](../docs/images/terramino-game.png)
+![Terramino Game Interface](./docs/images/terramino-game.png)
 *The Terramino game interface showing both VM-native (left) and Docker-native (right) deployments*
 
 ## 🚀 Quick Start
@@ -40,15 +40,15 @@ docker stack deploy -c docker/docker-stack.yml terramino
 The application includes a comprehensive monitoring stack with Grafana dashboards for real-time insights:
 
 ### Application Metrics Dashboard
-![Terramino App Overview](../docs/images/terramino-app-overview.png)
+![Terramino App Overview](./docs/images/terramino-app-overview.png)
 *Application-level metrics including games created, backend requests, scores, and Redis operations*
 
 ### Redis Performance Monitoring
-![Redis Overview](../docs/images/redis-overview.png)
+![Redis Overview](./docs/images/redis-overview.png)
 *Redis performance metrics showing operations per second and connected clients*
 
 ### Host System Monitoring
-![Host Overview](../docs/images/host-overview.png)
+![Host Overview](./docs/images/host-overview.png)
 *System-level monitoring with CPU usage and memory consumption metrics*
 
 ## 🏗️ Architecture
