@@ -1,0 +1,112 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--appendonly","no","--maxmemory","256mb","--maxmemory-policy","allkeys-lru"]
+    deploy: { replicas: 1 }
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    command: ["--redis.addr=redis://redis:6379"]
+    deploy: { replicas: 1 }
+
+  backend:
+    image: terramino-backend:local
+    deploy: { replicas: 1 }
+    ports:
+      - target: 8081
+        published: 8081
+        protocol: tcp
+        mode: ingress
+
+  frontend:
+    image: terramino-frontend:local
+    deploy: { replicas: 1 }
+    ports:
+      - target: 80
+        published: 8080
+        protocol: tcp
+        mode: ingress
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    deploy: { mode: global }
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    deploy: { mode: global }
+    ports:
+      - target: 8080
+        published: 8088
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+      - type: bind
+        source: /var/run
+        target: /var/run
+        read_only: true
+      - type: bind
+        source: /sys
+        target: /sys
+        read_only: true
+      - type: bind
+        source: /var/lib/docker
+        target: /var/lib/docker
+        read_only: true
+    command: ["--docker_only", "--housekeeping_interval=10s"]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    deploy: { replicas: 1 }
+    ports:
+      - target: 9090
+        published: 9090
+        protocol: tcp
+        mode: ingress
+    configs:
+      - source: prom-config
+        target: /etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    deploy: { replicas: 1 }
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: ingress
+    configs:
+      - source: terramino_graf-ds
+        target: /etc/grafana/provisioning/datasources/datasource.yml
+      - source: terramino_graf-db
+        target: /etc/grafana/provisioning/dashboards/dashboards.yml
+      - source: terramino_graf-dashboard-app
+        target: /var/lib/grafana/dashboards/app-overview.json
+      - source: terramino_graf-dashboard-host
+        target: /var/lib/grafana/dashboards/host-overview.json
+      - source: terramino_graf-dashboard-redis
+        target: /var/lib/grafana/dashboards/redis-overview.json
+
+configs:
+  prom-config:
+    file: ./prometheus/prometheus-swarm.yml
+  terramino_graf-ds:
+    file: ./grafana/provisioning/datasources/datasource.yml
+  terramino_graf-db:
+    file: ./grafana/provisioning/dashboards/dashboards.yml
+  terramino_graf-dashboard-app:
+    file: ./grafana/dashboards/app-overview.json
+  terramino_graf-dashboard-host:
+    file: ./grafana/dashboards/host-overview.json
+  terramino_graf-dashboard-redis:
+    file: ./grafana/dashboards/redis-overview.json
+
+networks:
+  default:
+    external: true
+    name: terramino_default

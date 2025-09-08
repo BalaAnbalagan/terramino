@@ -1,0 +1,25 @@
+{
+  "title": "Redis Overview",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Ops/sec",
+      "targets": [
+        {
+          "expr": "rate(redis_commands_processed_total[1m])"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Connected Clients",
+      "targets": [
+        {
+          "expr": "redis_connected_clients"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

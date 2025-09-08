@@ -1,0 +1,21 @@
+{
+  "title": "Terramino App Overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "panels": [
+    { "type": "graph", "title": "Games Created /s",
+      "targets": [ { "expr": "rate(terramino_games_created_total[5m])" } ] },
+    { "type": "graph", "title": "Backend Requests /s",
+      "targets": [ { "expr": "rate(terramino_requests_total[5m])" } ] },
+    { "type": "graph", "title": "Scores Submitted /s",
+      "targets": [ { "expr": "rate(terramino_scores_submitted_total[5m])" } ] },
+    { "type": "graph", "title": "Last Score",
+      "targets": [ { "expr": "terramino_last_score" } ] },
+    { "type": "graph", "title": "Redis Keys",
+      "targets": [ { "expr": "terramino_redis_keys" } ] },
+    { "type": "graph", "title": "Backend Up",
+      "targets": [ { "expr": "up{job=\"backend\"}" } ] }
+  ]
+}
+

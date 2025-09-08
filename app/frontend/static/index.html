@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Terramino</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display:flex; gap:24px; padding:20px; background:#111; color:#eee }
+    #left { display:flex; flex-direction:column; gap:12px }
+    #board { background:#000; border:2px solid #444 }
+    .btn { padding:8px 12px; background:#2a6; color:#fff; border:none; border-radius:6px; cursor:pointer }
+    .btn:disabled { background:#555 }
+    .stat { font-size:14px; color:#ccc }
+    a { color:#9cf }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <h1>Terramino</h1>
+    <div>
+      <button id="new" class="btn">New Game</button>
+      <button id="pause" class="btn" disabled>Pause</button>
+    </div>
+    <div class="stat">Game ID: <span id="gid">—</span></div>
+    <div class="stat">Score: <span id="score">0</span> &nbsp; Lines: <span id="lines">0</span></div>
+    <div class="stat">Controls: ← → move, ↑ rotate, ↓ soft drop, Space hard drop</div>
+    <div class="stat">API: <a href="/api/health" target="_blank">/api/health</a></div>
+  </div>
+  <canvas id="board" width="240" height="480"></canvas>
+
+<script>
+const W = 10, H = 20, CELL = 24;
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+let grid, piece, x, y, dropInt, gameId = null, running=false, score=0, lines=0, paused=false;
+
+const SHAPES = {
+  I: [[1,1,1,1]],
+  O: [[1,1],[1,1]],
+  T: [[0,1,0],[1,1,1]],
+  S: [[0,1,1],[1,1,0]],
+  Z: [[1,1,0],[0,1,1]],
+  J: [[1,0,0],[1,1,1]],
+  L: [[0,0,1],[1,1,1]],
+};
+const COLORS = { I:"#29adff", O:"#ffd400", T:"#d81b60", S:"#00e436", Z:"#ff004d", J:"#83769c", L:"#ffa300" };
+
+function newPiece(){
+  const keys = Object.keys(SHAPES);
+  const k = keys[Math.floor(Math.random()*keys.length)];
+  return {k, m: SHAPES[k].map(r=>r.slice())};
+}
+function rotate(m){
+  const N = m.length, M = m[0].length;
+  const r = Array.from({length:M},()=>Array(N).fill(0));
+  for (let i=0;i<N;i++) for(let j=0;j<M;j++) r[j][N-1-i]=m[i][j];
+  return r;
+}
+function collide(nx=x,ny=y,mat=piece.m){
+  for(let i=0;i<mat.length;i++)
+    for(let j=0;j<mat[i].length;j++)
+      if(mat[i][j]){
+        const gx=nx+j, gy=ny+i;
+        if(gx<0||gx>=W||gy>=H) return true;
+        if(gy>=0 && grid[gy][gx]) return true;
+      }
+  return false;
+}
+function merge(){
+  for(let i=0;i<piece.m.length;i++)
+    for(let j=0;j<piece.m[i].length;j++)
+      if(piece.m[i][j]){
+        const gx=x+j, gy=y+i;
+        if(gy>=0) grid[gy][gx]=piece.k;
+      }
+}
+function clearLines(){
+  let cleared=0;
+  for(let i=H-1;i>=0;i--){
+    if(grid[i].every(c=>c)){
+      grid.splice(i,1);
+      grid.unshift(Array(W).fill(null));
+      cleared++; i++;
+    }
+  }
+  if(cleared){
+    lines += cleared;
+    score += [0,100,300,500,800][cleared];
+    pushScore();
+  }
+}
+function draw(){
+  ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let i=0;i<H;i++) for(let j=0;j<W;j++){
+    const c = grid[i][j];
+    if(c){ ctx.fillStyle = COLORS[c]; ctx.fillRect(j*CELL,i*CELL,CELL-1,CELL-1); }
+  }
+  for(let i=0;i<piece.m.length;i++) for(let j=0;j<piece.m[i].length;j++)
+    if(piece.m[i][j]){
+      const gx=x+j, gy=y+i;
+      if(gy>=0){ ctx.fillStyle = COLORS[piece.k]; ctx.fillRect(gx*CELL, gy*CELL, CELL-1, CELL-1); }
+    }
+  document.getElementById('score').textContent = score;
+  document.getElementById('lines').textContent = lines;
+}
+function step(){
+  if(paused||!running) return;
+  if(!collide(x,y+1)){ y++; }
+  else {
+    merge(); clearLines();
+    piece = newPiece(); x=3; y=-2;
+    if(collide(x,y)){ gameOver(); return; }
+  }
+  draw();
+}
+function hardDrop(){ while(!collide(x,y+1)) y++; step(); }
+function gameOver(){
+  running=false;
+  clearInterval(dropInt);
+  alert("Game Over! Score: "+score);
+  pushScore(true);
+}
+function pushScore(final=false){
+  if(!gameId) return;
+  fetch('/api/score', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({game_id: gameId, score, lines, final })
+  }).catch(()=>{});
+}
+async function start(){
+  const r = await fetch('/api/new-game'); const j = await r.json();
+  gameId = j.game_id; document.getElementById('gid').textContent = gameId;
+  grid = Array.from({length:H}, ()=>Array(W).fill(null));
+  piece = newPiece(); x=3; y=-2; score=0; lines=0; paused=false; running=true;
+  document.getElementById('pause').disabled=false;
+  draw();
+  clearInterval(dropInt); dropInt = setInterval(step, 600);
+}
+document.getElementById('new').onclick = start;
+document.getElementById('pause').onclick = ()=>{ paused=!paused; document.getElementById('pause').textContent = paused ? 'Resume' : 'Pause'; };
+document.addEventListener('keydown', e=>{
+  if(!running||paused) return;
+  if(e.key==='ArrowLeft' && !collide(x-1,y)) x--;
+  else if(e.key==='ArrowRight' && !collide(x+1,y)) x++;
+  else if(e.key==='ArrowDown') step();
+  else if(e.key==='ArrowUp'){ const m=rotate(piece.m); if(!collide(x,y,m)) piece.m=m; }
+  else if(e.code==='Space') hardDrop();
+  draw();
+});
+</script>
+</body>
+</html>
