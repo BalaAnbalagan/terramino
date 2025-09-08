@@ -220,7 +220,7 @@ Repository: {{GITHUB_REPO_URL}}
 
 ![UI side-by-side](reports/media/ui-side-by-side.png)
 
-**Demo video:** [game-vm-docker.mp4](reports/media/game-vm-docker.mp4)
+**Demo video:** [game-vm-docker.mp4](docs/images/game-vm-docker.mp4)
 
 ### 1. Overview
 Two alternative deployment solutions are provided and benchmarked:
@@ -256,13 +256,6 @@ The monitoring stack demonstrates comprehensive observability across both deploy
 - **Prometheus** scrapes metrics from backend, redis_exporter, node_exporter (and cAdvisor for Docker-Native)
 - **Virtualization**: Both VM-Native (VirtualBox) and Docker-Native (Swarm on Docker Desktop) deployments run concurrently
 
-**Monitoring Screenshots:**
-- **Grafana App Overview**  
-  ![grafana-app-overview.png](reports/media/grafana-app-overview.png)
-- **Grafana Redis Overview**  
-  ![grafana-redis-overview.png](reports/media/grafana-redis-overview.png)
-- **Grafana Host Overview**  
-  ![grafana-host-overview.png](reports/media/grafana-host-overview.png)
 
 ### 4. Deployment Architecture Comparison
 
