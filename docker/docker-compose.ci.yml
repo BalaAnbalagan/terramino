@@ -1,0 +1,35 @@
+services:
+  redis:
+    image: redis:7-alpine
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    command: ["--redis.addr=redis://redis:6379"]
+    depends_on: [redis]
+  backend:
+    image: terramino-backend:ci
+    build: ../app/backend
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on: [redis]
+  frontend:
+    image: terramino-frontend:ci
+    build: ../app/frontend
+    ports:
+      - "8080:80"
+    depends_on: [backend]
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus-compose.yml:/etc/prometheus/prometheus.yml:ro
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning/dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./grafana/provisioning/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

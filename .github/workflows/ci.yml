@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  docker-native-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests matplotlib pandas
+
+      - name: Build app images
+        run: |
+          docker build -t terramino-backend:ci ./app/backend || true
+          docker build -t terramino-frontend:ci ./app/frontend || true
+
+      - name: Start stack (compose for CI)
+        run: |
+          docker compose -f docker/docker-compose.ci.yml up -d
+          echo "Waiting for services..."
+          for i in {1..40}; do
+            if curl -fsS http://localhost:8081/api/health >/dev/null 2>&1; then break; fi
+            sleep 3
+          done
+          curl -fsS http://localhost:8081/api/health
+
+      - name: Functional tests
+        env:
+          FRONTEND_URL: http://localhost:8080
+          BACKEND_URL:  http://localhost:8081
+          PROM_URL:     http://localhost:9090
+          GRAFANA_URL:  http://localhost:3000
+          EXPECT_NODE:  "false"
+          EXPECT_CADVISOR: "false"
+          OUT_JUNIT: reports/functional/results_ci.xml
+        run: |
+          python tests/functional/test_functional.py
+
+      - name: Short HTTP benchmark
+        env:
+          URL: http://localhost:8081/api/health
+          OUT: reports/benchmarks/http_ci.csv
+        run: |
+          ./tests/benchmark/http_bench.sh 50 10 || true
+
+      - name: Redis benchmark (compose network)
+        run: |
+          docker run --rm --network docker_default redis:7-alpine \
+            redis-benchmark -h redis -p 6379 -n 50000 --csv > reports/benchmarks/redis_ci.csv
+
+      - name: Charts
+        run: |
+          python reports/charts.py || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts
+          path: |
+            reports/**
+            tests/functional/**
+            tests/benchmark/**
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker/docker-compose.ci.yml down -v

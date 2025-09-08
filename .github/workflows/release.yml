@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  docker-images-and-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker images
+        run: |
+          docker build -t terramino-backend:release ./app/backend || true
+          docker build -t terramino-frontend:release ./app/frontend || true
+
+      - name: Export images
+        run: |
+          mkdir -p dist
+          docker save terramino-backend:release | gzip -c > dist/terramino-backend_release.tar.gz
+          docker save terramino-frontend:release | gzip -c > dist/terramino-frontend_release.tar.gz
+          sha256sum dist/* > dist/checksums.sha256
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/terramino-backend_release.tar.gz
+            dist/terramino-frontend_release.tar.gz
+            dist/checksums.sha256
+
+  package-vagrant-boxes:
+    # Requires a self-hosted runner with VirtualBox + Vagrant
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package boxes
+        run: |
+          ./scripts/package-vagrant.sh
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/terramino-vm-native.box
+            dist/terramino-docker-native.box
+            dist/boxes.sha256
