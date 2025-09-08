@@ -1,0 +1,2 @@
+﻿timestamp,stack,mode,t_total_ready_s,t_backend_s,t_frontend_s,t_prom_s,t_grafana_s,vm_systemd_total_s
+2025-09-08T07:33:15Z,docker,rebuild,17.934,15.963,14.343,14.39,17.934,
