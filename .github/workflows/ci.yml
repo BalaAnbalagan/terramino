@@ -19,22 +19,57 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install requests matplotlib pandas
+      
+      # ✅ Let Compose build using the contexts defined in docker/docker-compose.ci.yml
+      - name: Compose build
+        run: docker compose -f docker/docker-compose.ci.yml build 
 
-      - name: Build app images
+      # ✅ Bring the stack up and wait for containers to be running
+      - name: Compose up (with wait)
         run: |
-          docker build -t terramino-backend:ci ./app/backend || true
-          docker build -t terramino-frontend:ci ./app/frontend || true
-
-      - name: Start stack (compose for CI)
-        run: |
-          docker compose -f docker/docker-compose.ci.yml up -d --build --wait --wait-timeout 120
+          docker compose -f docker/docker-compose.ci.yml up -d --build --wait --wait-timeout 180
           docker compose -f docker/docker-compose.ci.yml ps
-          echo "Waiting for services..."
-          for i in {1..40}; do
-            if curl -fsS http://localhost:8081/api/health >/dev/null 2>&1; then break; fi
-            sleep 3
-          done
-          curl -fsS http://localhost:8081/api/health
+
+      # ✅ Gate on actual readiness of each endpoint, not just "container is running"
+      - name: Wait for app & observability to be ready
+        env:
+          FRONTEND_URL: http://localhost:8080
+          BACKEND_URL:  http://localhost:8081
+          PROM_URL:     http://localhost:9090
+          GRAFANA_URL:  http://localhost:3000
+        run: |
+          set -e
+          wait_url () { 
+            echo "Waiting for $1 ..."
+            for i in {1..60}; do
+              if curl -fsS "$1" >/dev/null 2>&1; then echo "OK $1"; return 0; fi
+              sleep 2
+            done
+            echo "TIMEOUT $1"; return 1
+          }
+          wait_url "$BACKEND_URL/api/health"
+          wait_url "$FRONTEND_URL"
+          wait_url "$PROM_URL/-/ready"
+          wait_url "$GRAFANA_URL/login"
+          # Also wait for Prometheus to actually scrape both targets
+          python - <<'PY'
+          import os, time, sys, requests
+          prom=os.environ.get("PROM_URL","http://localhost:9090")
+          expected={"backend","redis"}  # adjust if your Prometheus job_names differ
+          for i in range(45):
+              try:
+                  r=requests.get(f"{prom}/api/v1/targets", timeout=5)
+                  data=r.json()["data"]["activeTargets"]
+                  up={t["labels"].get("job") for t in data if t.get("health")=="up"}
+                  print("Prometheus up targets:", up)
+                  if expected.issubset(up):
+                      sys.exit(0)
+              except Exception as e:
+                  print("targets query error:", e)
+              time.sleep(2)
+          print("Timed out waiting for Prometheus targets", file=sys.stderr)
+          sys.exit(1)
+          PY 
 
       - name: Functional tests
         env:
